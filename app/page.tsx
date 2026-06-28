@@ -8,6 +8,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const [invoiceStatusUrl, setInvoiceStatusUrl] = useState<string | null>(null);
   const [invoiceData, setInvoiceData] = useState<any | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -16,6 +17,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setInvoiceUrl(null);
+    setInvoiceStatusUrl(null);
 
     try {
       const response = await fetch("/api/create-invoice", {
@@ -36,6 +38,7 @@ export default function Home() {
       }
 
       setInvoiceUrl(data.invoiceUrl);
+      setInvoiceStatusUrl(data.invoiceStatusUrl ?? null);
       setInvoiceData(data.invoice);
       setStatusMessage(data.invoice?.status ? `Invoice status: ${data.invoice.status}` : null);
     } catch (err) {
@@ -110,6 +113,19 @@ export default function Home() {
             >
               {invoiceUrl}
             </a>
+            {invoiceStatusUrl ? (
+              <p className="mt-2 text-sm">
+                Check the payment result after checkout:&nbsp;
+                <a
+                  href={invoiceStatusUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-700 underline dark:text-emerald-300"
+                >
+                  View status page
+                </a>
+              </p>
+            ) : null}
           </div>
         ) : null}
 

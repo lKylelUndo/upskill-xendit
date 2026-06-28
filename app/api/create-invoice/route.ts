@@ -19,19 +19,38 @@ export async function POST(request: Request) {
       );
     }
 
+    const origin = new URL(request.url).origin;
+
+    // Use an externalId that we can also look up later.
+    // Xendit will include this value as a query string when it redirects back.
+    const externalId = `demo-${Date.now()}`;
+
     const invoice = await xenditClient.Invoice.createInvoice({
       data: {
         amount: Number(amount),
         description,
-        externalId: `demo-${Date.now()}`,
+        externalId,
         currency: "PHP",
         reminderTime: 1,
+        // Redirect the buyer to a status page after payment completes.
+        successRedirectUrl: `${origin}/invoice-result?externalId=${encodeURIComponent(
+          externalId,
+        )}`,
+        failureRedirectUrl: `${origin}/invoice-result?externalId=${encodeURIComponent(
+          externalId,
+        )}`,
       },
     });
+
+    // Expose the same redirect link to the client so they can open a status page manually.
+    const invoiceStatusUrl = `${origin}/invoice-result?externalId=${encodeURIComponent(
+      externalId,
+    )}`;
 
     return NextResponse.json({
       invoiceUrl: invoice.invoiceUrl,
       invoice,
+      invoiceStatusUrl,
     });
   } catch (error) {
     console.error("Xendit invoice error:", error);

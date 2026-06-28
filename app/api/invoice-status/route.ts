@@ -10,18 +10,38 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { invoiceId } = await request.json();
+    const { invoiceId, externalId } = await request.json();
 
-    if (!invoiceId) {
+    if (!invoiceId && !externalId) {
       return NextResponse.json(
-        { error: "invoiceId is required." },
+        { error: "invoiceId or externalId is required." },
         { status: 400 }
       );
     }
 
-    const invoice = await xenditClient.Invoice.getInvoiceById({
-      invoiceId,
-    });
+    let invoice;
+    const requestExternalId =
+      externalId ||
+      (invoiceId && invoiceId.startsWith("demo-") ? invoiceId : undefined);
+
+    if (invoiceId && !requestExternalId) {
+      // invoiceId is a real Xendit invoice ID, not an externalId.
+      invoice = await xenditClient.Invoice.getInvoiceById({ invoiceId });
+    } else {
+      // If we only have demo-..., treat that as externalId and use getInvoices().
+      const invoices = await xenditClient.Invoice.getInvoices({
+        externalId: requestExternalId,
+        limit: 1,
+      });
+      invoice = invoices?.[0] ?? null;
+    }
+
+    if (!invoice) {
+      return NextResponse.json(
+        { error: "Invoice not found." },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ invoice });
   } catch (error) {

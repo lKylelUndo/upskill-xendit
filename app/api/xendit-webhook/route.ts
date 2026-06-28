@@ -22,6 +22,9 @@ export async function POST(request: Request) {
     console.log("Invoice paid:", invoice?.id || invoice?.external_id);
   }
 
+  // This response is sent back to Xendit, not to the browser.
+  // Xendit uses it to know the webhook was received successfully.
+
   return NextResponse.json({
     received: true,
     eventType: eventType ?? null,

@@ -1,22 +1,26 @@
-# Xendit Setup and Local Integration Guide
+# Xendit Setup and Vercel Integration Guide
 
-This guide explains how to set up the Xendit invoice flow in this Next.js app from scratch, including the API key permission settings.
+This guide explains how to set up the Xendit invoice flow in this Next.js app, including the Vercel deployment path and webhook configuration.
 
-## 1. Install the package SDK
+## 1. Install dependencies
 
 ```bash
-npm install xendit-node
+npm install
 ```
+
+This repo already depends on `xendit-node`, so running `npm install` is enough to get the SDK and the app dependencies.
 
 ## 2. Create environment variables
 
-Create a `.env` file in the project root with your Xendit secret key:
+Create a `.env` file in the project root with your Xendit keys and webhook token:
 
 ```env
 XENDIT_SECRET_KEY=REPLACE_WITH_YOUR_XENDIT_SECRET_KEY
+XENDIT_PUBLIC_KEY=REPLACE_WITH_YOUR_XENDIT_PUBLIC_KEY
+WEBHOOK_VERIFICATION_TOKEN=REPLACE_WITH_A_RANDOM_SECRET
 ```
 
-> Use the Xendit secret key, not the public key. For local testing, use a test secret key.
+> Use the Xendit secret key, not the public key. For the demo flow, use a test secret key from the Xendit Dashboard.
 
 ## 3. Configure Xendit API key permissions
 
@@ -26,19 +30,19 @@ In the Xendit Dashboard:
 2. Create a new secret key or select an existing one.
 3. Grant the key permission for the **Invoice** API.
    - Do not use a key that only has Money-out / Disbursements permissions for this invoice flow.
-4. If IP allowlisting is enabled in your Xendit account, add the public IP address of the machine or server running this app.
+4. If IP allowlisting is enabled, add the Vercel IP or your production server IP as needed.
 
 ### Why this matters
 
 - The app uses the Xendit Invoice API.
-- If the key is missing Invoice permission, Xendit returns a `403 Forbidden` error.
-- If IP allowlist is enabled and your current IP is not listed, the request will also fail.
+- If the key is missing Invoice permission, Xendit returns `403 Forbidden`.
+- If IP allowlist is enabled and the allowed IP is missing, the request will fail.
 
-## 4. Code files and how they are wired
+## 4. How the app is wired
 
 ### `lib/xendit.ts`
 
-This file creates the Xendit SDK client using `XENDIT_SECRET_KEY`:
+This file creates the Xendit SDK client using the secret key:
 
 ```ts
 import { Xendit } from "xendit-node";
@@ -50,133 +54,111 @@ export const xenditClient = process.env.XENDIT_SECRET_KEY
 
 ### `app/api/create-invoice/route.ts`
 
-This API route receives the invoice request from the client and creates a Xendit invoice:
+This API route:
 
-- It reads `amount` and `description`.
-- It calls `xenditClient.Invoice.createInvoice()`.
-- It returns `invoiceUrl` and the full `invoice` object.
+- receives `amount` and `description` from the browser
+- creates a Xendit invoice with `externalId`
+- sets `successRedirectUrl`/`failureRedirectUrl` to `invoice-result` on your app
+- returns the Xendit checkout URL and a status page link
 
 ### `app/api/invoice-status/route.ts`
 
-This optional route can fetch invoice status by `invoiceId`:
+This route fetches invoice status from Xendit:
 
-- It calls `xenditClient.Invoice.getInvoiceById({ invoiceId })`.
-- It returns the latest invoice status.
+- it accepts either `invoiceId` or `externalId`
+- if the value starts with `demo-...`, it treats it as an `externalId`
+- it returns the latest invoice object to the browser
 
-### `app/page.tsx`
+### `app/api/xendit-webhook/route.ts`
 
-This page contains the form and displays:
+This route receives webhook notifications from Xendit.
 
-- invoice creation result
-- invoice payment link (`invoiceUrl`)
-- invoice response data for debugging
-- current invoice status message
+- Xendit sends server-to-server POST requests here
+- If payment is `PAID`, you can update your database or app state
+- the response is an acknowledgement sent back to Xendit
 
-## 5. Run the app locally
+### `app/invoice-result/page.tsx`
 
-```bash
-npm run dev
-```
+This page shows the final payment result after the buyer is redirected back from Xendit.
 
-Open `http://localhost:3000` in your browser.
+- it reads `externalId` or `invoiceId` from the URL
+- it calls `/api/invoice-status`
+- it displays current invoice status and invoice details
 
-## 6. Test the flow
+## 5. Deploy to Vercel
 
-1. Enter an amount and description.
-2. Submit the form.
-3. The app creates a Xendit invoice and returns a checkout URL.
-4. Open the checkout URL and complete the payment in the simulator.
-5. To verify payment success, check the invoice status.
-
-## 7. Add webhook support for payment success
-
-The app now includes a webhook endpoint at `app/api/xendit-webhook/route.ts`.
-
-- Xendit will send invoice events to this URL when invoice status changes.
-- You should configure a publicly reachable HTTPS URL in the Xendit Dashboard.
-- `http://localhost:3000/api/xendit-webhook` does not work directly in Xendit because Dashboard webhooks must reach a public URL.
-
-### Local testing with ngrok
-
-1. Install ngrok if you do not have it:
-   - Download from https://ngrok.com/download
-   - Unzip and place the `ngrok` executable somewhere on your machine.
-
-2. Run your Next.js app locally:
-
-```bash
-npm run dev
-```
-
-3. Start an ngrok tunnel to port 3000:
-
-```bash
-npx ngrok http 3000
-```
-
-4. Copy the HTTPS forwarding URL shown by ngrok, for example:
-
-```text
-https://abcd1234.ngrok.io
-```
-
-5. In Xendit Dashboard, set the webhook URL to:
-
-```text
-https://abcd1234.ngrok.io/api/xendit-webhook
-```
-
-6. Use the Dashboard webhook test or create a fresh invoice and complete payment.
-
-### Deploying to Vercel instead of ngrok
-
-If you prefer not to use ngrok, deploy the app to Vercel and use its public URL.
+To use webhooks and redirects without ngrok, deploy the app to Vercel.
 
 1. Push your project to GitHub.
-2. Connect the repo to Vercel or use the Vercel CLI.
+2. Connect the repo to Vercel.
 3. Deploy the app.
-4. In the Vercel dashboard, add these environment variables:
+4. In Vercel settings, add:
    - `XENDIT_SECRET_KEY`
    - `XENDIT_PUBLIC_KEY`
-   - `WEBHOOK_VERIFICATION_TOKEN` (if you use webhook verification)
+   - `WEBHOOK_VERIFICATION_TOKEN`
 
-5. Use the deployed webhook URL in Xendit, for example:
+5. Use the Vercel app domain for your webhook and redirect URLs.
+
+## 6. Configure Xendit Webhooks
+
+In the Xendit Dashboard:
+
+1. Open **Developers** → **Webhook Logs** (or the webhook settings page).
+2. Set the webhook URL to:
 
 ```text
 https://your-app.vercel.app/api/xendit-webhook
 ```
 
-> Using Vercel is often easier for webhook testing because Xendit can reach a public HTTPS URL without tunneling.
+3. Make sure the webhook is enabled for `invoice.status` or invoice payment events.
 
-### What happens next
+## 7. How the payment flow works on Vercel
 
-- Xendit posts webhook payloads to your endpoint.
-- The handler logs the payload and checks for `invoice.status` events.
-- When `status` is `PAID`, you can update your database or mark the invoice as paid.
+1. Browser requests `POST /api/create-invoice`.
+2. Your backend creates a Xendit invoice with `externalId`.
+3. Xendit returns a checkout URL.
+4. User completes payment on the Xendit checkout page.
+5. Xendit redirects the browser to:
+   `https://your-app.vercel.app/invoice-result?externalId=demo-...`
+6. Your page calls `/api/invoice-status` to fetch the latest status.
+7. Xendit also sends a webhook to `/api/xendit-webhook` for server-side processing.
 
-> Note: ngrok works for local dev, but a production webhook URL must be a secure public HTTPS endpoint.
+## 8. What your app should do with the response
 
-## 8. What to look for on successful payment
+- `app/api/create-invoice/route.ts` returns the checkout link and the status page URL.
+- `app/invoice-result/page.tsx` displays the current invoice status.
+- `app/api/xendit-webhook/route.ts` receives the webhook from Xendit and can mark payment as paid.
 
-The invoice object returned by Xendit contains:
+> Important: Xendit webhook responses are sent to the server, not to the browser.
 
-- `invoice.id` — the invoice identifier
-- `invoice.status` — should become `PAID` after payment
-- `invoice.invoiceUrl` — the payment link
-- `invoice.amount` — the requested amount
-- `invoice.externalId` — the app-generated external ID
+## 9. Example URLs
 
-## 8. Common errors and fixes
+- Create invoice: `https://your-app.vercel.app/api/create-invoice`
+- Check status: `https://your-app.vercel.app/api/invoice-status`
+- Webhook: `https://your-app.vercel.app/api/xendit-webhook`
+- Redirect page: `https://your-app.vercel.app/invoice-result?externalId=demo-...`
+
+## 10. Test the flow on Vercel
+
+1. Create an invoice from the app.
+2. Open the Xendit checkout URL.
+3. Complete the payment in the simulator.
+4. Confirm the browser is redirected to `invoice-result`.
+5. Confirm the webhook log in Xendit shows a successful delivery.
+6. Confirm Vercel logs or your backend logs show the webhook payload.
+
+## 11. Common errors and fixes
 
 - `403 Forbidden` → secret key permission issue or IP allowlist restriction.
 - `UNSUPPORTED_CURRENCY` → the selected currency is not enabled for your Xendit account.
 - `Missing XENDIT_SECRET_KEY environment variable.` → `.env` key is not set or not loaded.
+- `400 Bad Request` on `/api/invoice-status` → use the correct `externalId` or invoice ID in the redirect URL.
 
-## 9. Going live
+## 12. Going live
 
-When ready to go live:
+When you are ready:
 
 - Replace the test secret key with a live secret key.
 - Make sure the live key has Invoice permissions.
-- Confirm all required currencies are enabled for the live account.
-- If using allowlist, add the production server IP.
+- Confirm all required currencies are enabled.
+- Deploy to production and use the production webhook URL.
