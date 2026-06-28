@@ -9,7 +9,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const [invoiceStatusUrl, setInvoiceStatusUrl] = useState<string | null>(null);
-  const [invoiceData, setInvoiceData] = useState<any | null>(null);
+  const [invoiceData, setInvoiceData] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
