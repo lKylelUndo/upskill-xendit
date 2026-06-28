@@ -89,7 +89,75 @@ Open `http://localhost:3000` in your browser.
 4. Open the checkout URL and complete the payment in the simulator.
 5. To verify payment success, check the invoice status.
 
-## 7. What to look for on successful payment
+## 7. Add webhook support for payment success
+
+The app now includes a webhook endpoint at `app/api/xendit-webhook/route.ts`.
+
+- Xendit will send invoice events to this URL when invoice status changes.
+- You should configure a publicly reachable HTTPS URL in the Xendit Dashboard.
+- `http://localhost:3000/api/xendit-webhook` does not work directly in Xendit because Dashboard webhooks must reach a public URL.
+
+### Local testing with ngrok
+
+1. Install ngrok if you do not have it:
+   - Download from https://ngrok.com/download
+   - Unzip and place the `ngrok` executable somewhere on your machine.
+
+2. Run your Next.js app locally:
+
+```bash
+npm run dev
+```
+
+3. Start an ngrok tunnel to port 3000:
+
+```bash
+npx ngrok http 3000
+```
+
+4. Copy the HTTPS forwarding URL shown by ngrok, for example:
+
+```text
+https://abcd1234.ngrok.io
+```
+
+5. In Xendit Dashboard, set the webhook URL to:
+
+```text
+https://abcd1234.ngrok.io/api/xendit-webhook
+```
+
+6. Use the Dashboard webhook test or create a fresh invoice and complete payment.
+
+### Deploying to Vercel instead of ngrok
+
+If you prefer not to use ngrok, deploy the app to Vercel and use its public URL.
+
+1. Push your project to GitHub.
+2. Connect the repo to Vercel or use the Vercel CLI.
+3. Deploy the app.
+4. In the Vercel dashboard, add these environment variables:
+   - `XENDIT_SECRET_KEY`
+   - `XENDIT_PUBLIC_KEY`
+   - `WEBHOOK_VERIFICATION_TOKEN` (if you use webhook verification)
+
+5. Use the deployed webhook URL in Xendit, for example:
+
+```text
+https://your-app.vercel.app/api/xendit-webhook
+```
+
+> Using Vercel is often easier for webhook testing because Xendit can reach a public HTTPS URL without tunneling.
+
+### What happens next
+
+- Xendit posts webhook payloads to your endpoint.
+- The handler logs the payload and checks for `invoice.status` events.
+- When `status` is `PAID`, you can update your database or mark the invoice as paid.
+
+> Note: ngrok works for local dev, but a production webhook URL must be a secure public HTTPS endpoint.
+
+## 8. What to look for on successful payment
 
 The invoice object returned by Xendit contains:
 
