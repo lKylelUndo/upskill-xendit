@@ -2,11 +2,10 @@
 
 This guide explains how to set up the Xendit invoice flow in this Next.js app from scratch, including the API key permission settings.
 
-## 1. Install the project
+## 1. Install the package SDK
 
 ```bash
-cd c:\Users\Kyle Ando\Desktop\practice\upskill-xendit
-npm install
+npm install xendit-node
 ```
 
 ## 2. Create environment variables
