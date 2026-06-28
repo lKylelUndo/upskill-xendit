@@ -24,11 +24,11 @@ export default function InvoiceResultClient() {
       const invoiceKey =
         externalId ||
         (invoiceId && invoiceId.startsWith("demo-") ? invoiceId : invoiceId);
-      const field =
-        externalId ||
-        (invoiceId && invoiceId.startsWith("demo-")
-          ? "externalId"
-          : "invoiceId");
+      const field = externalId
+        ? "externalId"
+        : invoiceId && invoiceId.startsWith("demo-")
+        ? "externalId"
+        : "invoiceId";
 
       if (!invoiceKey) {
         setError("Missing invoiceId or externalId in the URL.");
@@ -79,9 +79,9 @@ export default function InvoiceResultClient() {
           </p>
         </div>
 
-        {!invoiceId ? (
+        {!invoiceId && !externalId ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-            Missing invoice ID. Open this page with `?invoiceId=...` in the URL.
+            Missing invoice ID or external ID. Open this page with `?invoiceId=...` or `?externalId=...` in the URL.
           </div>
         ) : null}
 
